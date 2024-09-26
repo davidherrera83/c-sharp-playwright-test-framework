@@ -1,48 +1,34 @@
 using Xunit;
-using System;
-using System.Text.Json;
-using Microsoft.Playwright;
 using System.Threading.Tasks;
-using System.Text.Json.Nodes;
-using System.Collections.Generic;
+using BookstoreAPI.Services.Account;
 
 namespace BookstoreAPI.Tests
 {
     public class AccountTests
     {
+      private readonly AccountService _accountServive = new AccountService();
+
         [Fact]
         public async Task CreateUser()
         {
-            using (var playwright = await Playwright.CreateAsync())
-            {
-                var requestContext = await playwright.APIRequest.NewContextAsync();
+            //Act: Call the service to create a new user
+            var userId = await AccountService.CreateUser("davidtest4", "P@ssw0rd123!");
+            System.Console.WriteLine(userId);
+            //Assert: Ensure the userId is not null or empty
+            Assert.False(string.IsNullOrEmpty(userId), "User creation failed, returned userId is null or empty.");
+        }
 
-                var userPayload = new
-                {
-                    userName = "TestUser" + System.Guid.NewGuid().ToString(),
-                    password = "P@ssw0rd123!"
-                };
+        [Fact]
+        public async Task DeleteUser()
+        {
+            // Arrange: First create a user to delete
+            var userId = await AccountService.CreateUser("testuser", "P@ssw0rd123!");
 
-                var response = await requestContext.PostAsync("https://demoqa.com/Account/v1/User", new APIRequestContextOptions
-                {
-                    Headers = new Dictionary<string, string>
-                    {
-                        {"Content-Type", "application/json"}
-                    },
-                    DataObject = userPayload
-                });
+            // Act: Delete the user
+            var isDeleted = await AccountService.DeleteUser(userId);
 
-                if (response.Status == 201)
-                {
-                    Console.WriteLine($"Response Status: {response.Status}");
-                    var responseBody = await response.TextAsync();
-                    Console.WriteLine($"Response Body: {responseBody}");
-                }
-                else
-                {
-                    throw new Exception($"Response was not OK: Received Status Code: {response.Status}");
-                }
-            }
+            // Assert: Ensure the user was successfully deleted
+            Assert.True(isDeleted, $"Failed to delete user with ID {userId}.");
         }
     }
 }
