@@ -1,17 +1,14 @@
-﻿using System;
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.Playwright;
-using System.Threading.Tasks;
-using System.Collections.Generic;
+using BookstoreAPI.Services.Helpers;
 
 namespace BookstoreAPI.Services.Account
 {
     public class AccountService
     {
-        public static async Task<string> CreateUser(string userName, string password)
+        public async Task<string> CreateUser(string userName, string password)
         {
-            using var playwright = await Playwright.CreateAsync();
-            var requestContext = await playwright.APIRequest.NewContextAsync();
+            var requestContext = await PlaywrightHelper.CreateRequestContext();
             var userPayload = new
             {
                 userName,
@@ -24,9 +21,10 @@ namespace BookstoreAPI.Services.Account
                 DataObject = userPayload
             });
 
+            var responseBody = await response.TextAsync();  // Capture the response body
+
             if (response.Status == 201)
             {
-                var responseBody = await response.TextAsync();
                 var responseJson = JsonSerializer.Deserialize<Dictionary<string, object>>(responseBody);
                 if (responseJson != null)
                 {
@@ -46,23 +44,59 @@ namespace BookstoreAPI.Services.Account
             }
             else
             {
-                throw new Exception($"Failed to create user: Received Status Code: {response.Status}");
+                // Log the detailed response for debugging
+                throw new Exception($"Failed to create user: Received Status Code: {response.Status}. Response Body: {responseBody}");
             }
         }
-
-        public static async Task<bool> DeleteUser(string userId)
+        public async Task<bool> DeleteUser(string userId, string token)
         {
-            using var playwright = await Playwright.CreateAsync();
-            var requestContext = await playwright.APIRequest.NewContextAsync();
+            var requestContext = await PlaywrightHelper.CreateRequestContext(token);
+
             var response = await requestContext.DeleteAsync($"https://demoqa.com/Account/v1/User/{userId}");
 
-            if (response.Status == 200)
+            if (response.Status == 204)
             {
                 return true;
             }
             else
             {
                 throw new Exception($"Failed to delete user with ID {userId}: Received Status Code: {response.Status}");
+            }
+        }
+
+        public async Task<string> GenerateToken(string userName, string password)
+        {
+            var requestContext = await PlaywrightHelper.CreateRequestContext();
+
+            var tokenPayload = new
+            {
+                userName,
+                password
+            };
+
+            var response = await requestContext.PostAsync("https://demoqa.com/Account/v1/GenerateToken", new APIRequestContextOptions
+            {
+                Headers = new Dictionary<string, string> { { "Content-Type", "application/json" } },
+                DataObject = tokenPayload
+            });
+
+            var responseBody = await response.TextAsync();
+
+            if (response.Status == 200)
+            {
+                var responseJson = JsonSerializer.Deserialize<Dictionary<string, object>>(responseBody);
+                if (responseJson != null && responseJson.TryGetValue("token", out var token))
+                {
+                    return token.ToString();
+                }
+                else
+                {
+                    throw new InvalidOperationException("Token not found in the response.");
+                }
+            }
+            else
+            {
+                throw new Exception($"Failed to generate token: Received Status Code: {response.Status}");
             }
         }
     }
